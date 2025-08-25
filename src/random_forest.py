@@ -40,12 +40,7 @@ class RandomForest:
         all_paths : list
             List of (tree_index, path) pairs.
         """
-        # all_paths_preds = []
-        # for i, tree in enumerate(self.trees):
-        #     path = tree.trace_path(x, feature_names=feature_names, pretty_print=pretty_print)
-        #     pred = int(tree.predict([x])[0])
-        #     all_paths_preds.append((i, path, pred))
-        # return all_paths_preds
+
         all_paths = []
         for i, tree in enumerate(self.trees):
             steps = tree.trace_path(x, feature_names=feature_names, pretty_print=pretty_print)
@@ -88,14 +83,6 @@ class RandomForest:
 
             entry["vote_share"] = round(vote_share, 2)  # which percentage of trees voted for the class
 
-            #entry["paths"] = [
-            #    {"tree": tree_idx, "steps": steps, "tree_prediction": int(tree_preds[tree_idx])}
-            #    for tree_idx, steps in sample_paths
-            #]
-            #entry["paths"] = [
-            #    {"tree": i, "tree_prediction": int(tree_preds[i]), "steps": steps}
-            #    for i, steps in enumerate(sample_paths)
-            #]
             entry["paths"] = [
                 {
                     "tree": tree_idx,
@@ -113,7 +100,6 @@ class RandomForest:
     def _bootstrap_samples(self, X, y):
         n_samples = X.shape[0]
         idxs = np.random.choice(n_samples, n_samples, replace=True)
-        #return X.iloc[idxs], y.iloc[idxs]
         return X[idxs], y[idxs]
     
     def _most_common_label(self, y):
@@ -122,6 +108,5 @@ class RandomForest:
         return most_common
         
     def predict(self, X):
-        print("FOREST PREDICT")
         predictions = np.array([tree.predict(X) for tree in self.trees])
         return np.array([self._most_common_label(pred) for pred in predictions.T])

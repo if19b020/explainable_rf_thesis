@@ -14,15 +14,14 @@ class DecisionTree:
         """Train the decision tree using recursive splitting."""
         X = np.array(X)
         y = np.array(y)
-        self.n_features = min(self.n_features, X.shape[1])  # Ensure not exceeding available features
+        self.n_features = min(self.n_features, X.shape[1]) 
 
         self.root = self._grow_tree(X, y, depth=0)        
 
     def predict(self, X):
-        print("PREDICT")
         self.paths = []  # Reset paths on every prediction
         predictions = []
-        X = np.array(X)  # <-- Ensure we're working with a NumPy array
+        X = np.array(X) 
 
         for sample in X:
             path = []
@@ -100,7 +99,6 @@ class DecisionTree:
         left_child = self._grow_tree(X[left_idx], y[left_idx], depth + 1)
         right_child = self._grow_tree(X[right_idx], y[right_idx], depth + 1)
 
-        #return {"feature": feature, "threshold": threshold, "left": left_child, "right": right_child}
         return Node(feature, threshold, left=left_child, right=right_child)
 
     def _find_best_split(self, X, y):
@@ -110,13 +108,9 @@ class DecisionTree:
 
         features = np.random.choice(X.shape[1], self.n_features, replace=False)
         for feature in features:
-        #for feature in range(X.shape[1]):  # Loop through all features
             thresholds = np.unique(X[:, feature])  # Unique feature values
             if len(thresholds) < 2:  # Skip constant features
                 continue
-
-            # Use midpoints between unique values to reduce number of splits
-            #split_points = (thresholds[:-1] + thresholds[1:]) / 2  
 
             for threshold in thresholds:
                 gain = self._information_gain(X, y, feature, threshold)
@@ -143,7 +137,7 @@ class DecisionTree:
             (len(y[right_mask]) / len(y)) * self._gini_impurity(y[right_mask])
         )
 
-        return impurity_before - impurity_after  # Gain = Before - After
+        return impurity_before - impurity_after
 
     def _gini_impurity(self, y):
         """Calculate Gini impurity for a set of labels."""
