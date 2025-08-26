@@ -11,10 +11,11 @@ class DecisionTree:
         self.paths = []
     
     def fit(self, X, y):
-        """Train the decision tree using recursive splitting."""
+        """Fit the decision tree to the data set."""
         X = np.array(X)
         y = np.array(y)
-        self.n_features = min(self.n_features, X.shape[1]) 
+        self.n_features = min(self.n_features, X.shape[1])
+        self.n_classes = len(np.unique(y))
 
         self.root = self._grow_tree(X, y, depth=0)        
 
@@ -75,21 +76,63 @@ class DecisionTree:
                     f"  Step {step_num}: {step['feature']} = {step['value']:.2f} "
                     f"{step['direction']} {step['threshold']:.2f}"
                 )
-
         return path
     
+    def compute_contributions(self, x, target_class, feature_names=None):
+        contributions = {}
+        node = self.root
+
+        # Probability at root
+        prev_prob = self._node_probability(node, target_class)
+        base_value = prev_prob
+
+        # Traverse path
+        while node and node.feature is not None:
+            feature_idx = node.feature
+            feature_name = (
+                feature_names[feature_idx] if feature_names is not None else f"Feature[{feature_idx}]"
+            )
+            value = x[feature_idx]
+
+            # Choose branch
+            if value <= node.threshold:
+                child = node.left
+            else:
+                child = node.right
+
+            # Probability after split
+            new_prob = self._node_probability(child, target_class)
+            delta = new_prob - prev_prob
+
+            # Add to contributions
+            contributions[feature_name] = contributions.get(feature_name, 0) + delta
+
+            # Move down
+            node = child
+            prev_prob = new_prob
+
+        final_value = prev_prob
+        return base_value, final_value, contributions
+    
+    def _node_probability(self, node, target_class):
+        if node.class_counts is None or sum(node.class_counts) == 0:
+            return 0.0
+        return node.class_counts[target_class] / sum(node.class_counts)
         
     def _grow_tree(self, X, y, depth):
         """Recursively grows the decision tree."""
+        # class counts at this node for feature contribution
+        class_counts = [np.sum(y == c) for c in range(self.n_classes)]
+        
         # Stopping condition: Max depth reached or too few samples
         if depth >= self.max_depth or len(y) < self.min_samples_split:
-            return self._create_leaf(y)
+            return self._create_leaf(y, class_counts)
 
         # Find best feature and threshold for splitting
         feature, threshold = self._find_best_split(X, y)
         
         if feature is None:  # If no valid split found, return leaf
-            return self._create_leaf(y)
+            return self._create_leaf(y, class_counts)
 
         # Split data into left and right branches
         left_idx = X[:, feature] < threshold
@@ -99,7 +142,7 @@ class DecisionTree:
         left_child = self._grow_tree(X[left_idx], y[left_idx], depth + 1)
         right_child = self._grow_tree(X[right_idx], y[right_idx], depth + 1)
 
-        return Node(feature, threshold, left=left_child, right=right_child)
+        return Node(feature, threshold, left=left_child, right=right_child, class_counts=class_counts)
 
     def _find_best_split(self, X, y):
         """Find the best feature and threshold to split the data."""
@@ -148,9 +191,9 @@ class DecisionTree:
         probabilities = counts / len(y)
         return 1 - np.sum(probabilities ** 2)
     
-    def _create_leaf(self, y):
+    def _create_leaf(self, y, class_counts):
         """Create a leaf node by returning the majority class."""
-        return Node(value=np.bincount(y).argmax())
+        return Node(value=np.bincount(y).argmax(), class_counts=class_counts)
     
     def _traverse_tree(self, node, x, path):
         """Recursively traverse the tree to make a prediction."""

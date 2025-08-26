@@ -16,7 +16,6 @@ class RandomForest:
         y = np.array(y)
         np.random.seed(12)
 
-        self.trees = []
         for _ in range(self.n_trees):
             tree = DecisionTree(max_depth=self.max_depth, min_samples_split=self.min_samples_split,
                          n_features=self.n_features)
@@ -96,6 +95,42 @@ class RandomForest:
 
         with open(filename, "w") as f:
             json.dump(all_data, f, indent=2)
+            
+    def compute_feature_contributions(self, x, feature_names=None):
+        """
+        Compute average feature contributions across all trees for a given sample.
+        Returns:
+            {
+                "base_value": float,
+                "final_value": float,
+                "contributions": {feature_name: avg_contribution}
+            }
+        """
+        # Get the predicted class from the forest
+        target_class = int(self.predict([x])[0])
+
+        total_contributions = {}
+        base_values = []
+        final_values = []
+
+        for tree in self.trees:
+            base, final, contribs = tree.compute_contributions(x, target_class, feature_names)
+            base_values.append(base)
+            final_values.append(final)
+
+            # Aggregate contributions
+            for feat, val in contribs.items():
+                total_contributions[feat] = total_contributions.get(feat, 0) + val
+
+        # Average over all trees
+        avg_contributions = {k: v / len(self.trees) for k, v in total_contributions.items()}
+
+        return {
+            "base_value": sum(base_values) / len(base_values),
+            "final_value": sum(final_values) / len(final_values),
+            "contributions": avg_contributions
+        }
+
 
     def _bootstrap_samples(self, X, y):
         n_samples = X.shape[0]
