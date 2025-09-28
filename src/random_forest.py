@@ -3,70 +3,41 @@ import numpy as np
 from collections import Counter
 
 class RandomForest:
-    def __init__(self, n_trees=10, max_depth=10, min_samples_split=2, n_features=5):
+    def __init__(self, n_trees=5, max_depth=5, min_samples_split=2, n_features=5, random_state=None):
         self.n_trees = n_trees
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.n_features = n_features
-        self.trees = []
+        self.random_state = random_state
+        self.trees: list[DecisionTree] = []
         self.paths = []
         
     def fit(self, X, y):
         X = np.array(X)
         y = np.array(y)
-        np.random.seed(12)
+        
+        if self.random_state is not None:
+            np.random.seed(self.random_state)
 
         for _ in range(self.n_trees):
             tree = DecisionTree(max_depth=self.max_depth, min_samples_split=self.min_samples_split,
-                         n_features=self.n_features)
+                         n_features=int(np.sqrt(X.shape[1])))
             X_sample, y_sample = self._bootstrap_samples(X, y)
             tree.fit(X_sample, y_sample)
             self.trees.append(tree)
             
-    def trace_paths(self, x, feature_names=None, pretty_print=False):
+    def predict_and_export(self, X, y=None, feature_names=None, filename="paths.json"):
         """
-        Trace decision paths for all trees in the forest.
-
-        Parameters
-        ----------
-        x : array-like
-            Feature values for a single sample.
-        feature_names : list of str, optional
-        pretty_print : bool, optional
-
-        Returns
-        -------
-        all_paths : list
-            List of (tree_index, path) pairs.
-        """
-
-        all_paths = []
-        for i, tree in enumerate(self.trees):
-            steps = tree.trace_path(x, feature_names=feature_names, pretty_print=pretty_print)
-            all_paths.append((i, steps))
-        return all_paths
-    
-    def save_paths(self, X, y=None, feature_names=None, filename="paths.json"):
-        """
-        Save decision paths and predictions for multiple samples to a JSON file.
-
-        Parameters
-        ----------
-        X : array-like
-            Dataset to trace.
-        y : array-like, optional
-            True labels (for reference).
-        feature_names : list of str, optional
-            Feature names for readability.
-        filename : str
-            Path to output JSON file.
+        Predict X and export paths and feature contributions to JSON file.
         """
         import json
         all_data = []
+        y_pred = []
 
         for sample_idx, x in enumerate(X):
-            sample_paths = self.trace_paths(x, feature_names=feature_names, pretty_print=False)
+            sample_paths = self._trace_paths(x, feature_names=feature_names)
             pred_class = int(self.predict([x])[0])
+            y_pred.append(pred_class)
 
             # Get each tree's prediction
             tree_preds = [tree.predict([x])[0] for tree in self.trees]
@@ -82,6 +53,8 @@ class RandomForest:
 
             entry["vote_share"] = round(vote_share, 2)  # which percentage of trees voted for the class
 
+            entry["feature_contributions"] = self._compute_feature_contributions(x, feature_names)
+
             entry["paths"] = [
                 {
                     "tree": tree_idx,
@@ -90,13 +63,30 @@ class RandomForest:
                 }
                 for tree_idx, steps in sample_paths
             ]
-
+            
             all_data.append(entry)
 
         with open(filename, "w") as f:
             json.dump(all_data, f, indent=2)
             
-    def compute_feature_contributions(self, x, feature_names=None):
+        return y_pred
+        
+    def predict(self, X):
+        predictions = np.array([tree.predict(X) for tree in self.trees])
+        return np.array([self._most_common_label(pred) for pred in predictions.T])
+            
+    def _trace_paths(self, x, feature_names=None):
+        """
+        Trace decision paths for all trees in the forest.
+        """
+
+        all_paths = []
+        for i, tree in enumerate(self.trees):
+            steps = tree.trace_path(x, feature_names=feature_names)
+            all_paths.append((i, steps))
+        return all_paths
+            
+    def _compute_feature_contributions(self, x, feature_names=None):
         """
         Compute average feature contributions across all trees for a given sample.
         Returns:
@@ -124,24 +114,26 @@ class RandomForest:
 
         # Average over all trees
         avg_contributions = {k: v / len(self.trees) for k, v in total_contributions.items()}
+        sorted_contributions = dict(
+            sorted(
+                ((k, round(v, 3)) for k, v in avg_contributions.items()),
+                key=lambda item: item[1],  # sort by value
+                reverse=True
+            )
+        )
 
         return {
-            "base_value": sum(base_values) / len(base_values),
-            "final_value": sum(final_values) / len(final_values),
-            "contributions": avg_contributions
+            "base_value":       round( sum(base_values) / len(base_values), 3 ),
+            "final_value":      round( sum(final_values) / len(final_values), 3 ),
+            "contributions":    sorted_contributions
         }
-
 
     def _bootstrap_samples(self, X, y):
         n_samples = X.shape[0]
-        idxs = np.random.choice(n_samples, n_samples, replace=True)
+        idxs = np.random.choice(n_samples, n_samples, replace=True,)
         return X[idxs], y[idxs]
     
     def _most_common_label(self, y):
         counter = Counter(y)
         most_common = counter.most_common(1)[0][0]
         return most_common
-        
-    def predict(self, X):
-        predictions = np.array([tree.predict(X) for tree in self.trees])
-        return np.array([self._most_common_label(pred) for pred in predictions.T])
