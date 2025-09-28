@@ -2,10 +2,10 @@ import numpy as np
 from node import Node
 
 class DecisionTree:
-    def __init__(self, max_depth = 5, min_samples_split = 3, n_features = 5):
+    def __init__(self, max_depth = 5, min_samples_split = 2, n_features = 5):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
-        self.n_features = n_features # number of features considered for the tree
+        self.n_features = n_features
         self.root = None
         self.predictions = []
         self.paths = []
@@ -14,7 +14,7 @@ class DecisionTree:
         """Fit the decision tree to the data set."""
         X = np.array(X)
         y = np.array(y)
-        self.n_features = min(self.n_features, X.shape[1])
+        self.n_features = X.shape[1]
         self.n_classes = len(np.unique(y))
 
         self.root = self._grow_tree(X, y, depth=0)        
@@ -32,7 +32,7 @@ class DecisionTree:
 
         return np.array(predictions)
     
-    def trace_path(self, x, feature_names=None, pretty_print=False):
+    def trace_path(self, x, feature_names=None):
         """
         Trace the decision path for a single sample.
 
@@ -42,8 +42,6 @@ class DecisionTree:
             Feature values for a single sample.
         feature_names : list of str, optional
             Names of the features; if None, generic names are used.
-        pretty_print : bool, optional
-            If True, prints an ASCII-style tree path.
 
         Returns
         -------
@@ -67,15 +65,8 @@ class DecisionTree:
                 'direction': direction,
                 'value': value
             })
-            node = node.left if value <= node.threshold else node.right
+            node = node.left_child if value <= node.threshold else node.right_child
 
-        if pretty_print:
-            print("Decision Path:")
-            for step_num, step in enumerate(path, start=1):
-                print(
-                    f"  Step {step_num}: {step['feature']} = {step['value']:.2f} "
-                    f"{step['direction']} {step['threshold']:.2f}"
-                )
         return path
     
     def compute_contributions(self, x, target_class, feature_names=None):
@@ -96,9 +87,9 @@ class DecisionTree:
 
             # Choose branch
             if value <= node.threshold:
-                child = node.left
+                child = node.left_child
             else:
-                child = node.right
+                child = node.right_child
 
             # Probability after split
             new_prob = self._node_probability(child, target_class)
@@ -202,9 +193,9 @@ class DecisionTree:
 
         if x[node.feature] <= node.threshold:
             path.append((node.feature, node.threshold, "<=", x[node.feature]))
-            return self._traverse_tree(node.left, x, path)
+            return self._traverse_tree(node.left_child, x, path)
         else:
             path.append((node.feature, node.threshold, ">", x[node.feature]))
-            return self._traverse_tree(node.right, x, path)
+            return self._traverse_tree(node.right_child, x, path)
         
     
