@@ -17,8 +17,7 @@ This repository contains the implementation of an **Explainable Random Forest (R
 ## Installation
 Clone the repository and install required dependencies:
 ```bash
-git clone https://github.com/your-username/explainable-rf.git
-cd explainable-rf
+git clone https://github.com/if19b020/explainable_rf_thesis
 pip install -r requirements.txt
 ```
 
